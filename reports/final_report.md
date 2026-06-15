@@ -1,118 +1,209 @@
+# Rancangan Mini Pipeline MLOps untuk Estimasi Tarif Transportasi Online Berdasarkan Data Perjalanan
 
-# Final Report
+## 1. Pendahuluan
 
-## 1. Cover / Title
+Transportasi online menghasilkan data perjalanan yang dapat digunakan untuk memperkirakan tarif perjalanan. Kasus estimasi tarif dipilih karena sesuai dengan konteks Data Mining dan MLOps: data perlu diaudit, dibersihkan, diproses menjadi fitur model, dievaluasi, lalu disiapkan dalam skenario release sederhana.
 
-**Mini MLOps Pipeline Design for Online Transportation Fare Estimation Based on Trip and Weather Data**
+Project ini berfokus pada estimasi tarif transportasi online berdasarkan data perjalanan. Target yang diprediksi adalah `price`, sehingga masalah ini termasuk regresi karena nilai target berbentuk numerik.
 
-Project ini dibuat sebagai mini project Data Mining dan MLOps. Fokusnya adalah membuat simulasi pipeline MLOps untuk estimasi tarif transportasi online berdasarkan data perjalanan.
+## 2. Tujuan Proyek
 
-## 2. Project Background
+Tujuan project ini adalah:
 
-Estimasi tarif transportasi online adalah contoh kasus yang relevan karena melibatkan data perjalanan, fitur lokasi, jarak, waktu, dan jenis layanan. Dalam dunia nyata, sistem seperti ini harus memiliki data yang bersih, model yang terukur, dan proses monitoring.
+- Merancang mini pipeline MLOps sederhana.
+- Membuat checklist CI untuk validasi data dan pipeline.
+- Membuat checklist CT untuk kualitas model.
+- Membuat skenario CD untuk simulasi release model.
+- Membuat diagram pipeline.
+- Membuat tabel checklist kualitas.
 
-Dalam project ini, kami tidak membangun sistem pricing nyata. Project ini hanya simulasi pembelajaran untuk memahami bagaimana alur MLOps dapat dirancang dari awal sampai release scenario.
+## 3. Deskripsi Dataset
 
-## 3. Problem Statement
+Dataset utama yang digunakan adalah `cab_rides.csv`.
 
-Masalah yang ingin diselesaikan adalah bagaimana membuat model baseline yang dapat memperkirakan `price` dari data perjalanan, serta bagaimana menyiapkan pipeline MLOps sederhana untuk memvalidasi data, mengevaluasi model, dan merancang deployment scenario.
+Sumber dataset: https://www.kaggle.com/datasets/ravi72munde/uber-lyft-cab-prices
 
-## 4. Project Objective
+Data awal memiliki 693,071 baris dan 10 kolom. Target model adalah `price`.
 
-- Memahami struktur dan kualitas dataset.
-- Membersihkan data untuk supervised regression.
-- Melatih beberapa baseline model sederhana.
-- Mengevaluasi model dengan metrik regression.
-- Membuat CI, CT, dan CD checklist.
-- Menyiapkan model registry, API plan, Shadow Deployment scenario, dan pipeline diagram.
+Kolom penting yang digunakan dalam analisis:
 
-## 5. Dataset Description
+- `distance`: jarak perjalanan.
+- `cab_type`: platform atau jenis layanan transportasi.
+- `source`: lokasi asal.
+- `destination`: lokasi tujuan.
+- `name`: nama layanan.
+- `time_stamp`: waktu perjalanan dalam format timestamp.
+- `price`: tarif perjalanan yang menjadi target prediksi.
 
-- `data/raw/cab_rides.csv`: data perjalanan dan harga.
-- `data/raw/weather.csv`: data cuaca.
-- `data/processed/cleaned_cab_rides.csv`: data cab ride yang sudah dibersihkan.
+Project ini hanya menggunakan data perjalanan dari `cab_rides.csv`.
 
-Raw cab ride data memiliki 693.071 baris. Setelah cleaning, data yang digunakan menjadi 637.976 baris. Weather data belum digabungkan karena perlu alignment waktu dan lokasi.
+## 4. Data Audit
 
-## 6. Data Audit Summary
+Hasil audit awal pada `cab_rides.csv`:
 
-Target utama adalah `price`. Kolom `price` memiliki 55.095 missing values, sehingga baris tersebut tidak dipakai untuk supervised training.
-
-Hasil audit penting: `distance <= 0` sebanyak 0 baris, `price <= 0` sebanyak 0 baris pada non-missing price, dan `source`, `destination`, `cab_type`, serta `name` tidak memiliki missing value.
-
-## 7. Preprocessing Summary
-
-Cleaning dilakukan dengan menghapus missing `price`, mengecek `distance > 0`, mengecek `price > 0`, mengecek duplicate row, dan membuat fitur waktu dari `time_stamp`.
-
-Fitur baseline utama: `distance`, `cab_type`, `source`, `destination`, `name`, `hour`, `day`, `month`, dan `day_of_week`.
-
-Fitur yang dikeluarkan: `id`, `product_id`, `price`, `surge_multiplier`, dan weather columns.
-
-## 8. Model Training Summary
-
-Model yang dibandingkan adalah Dummy Regressor, Ridge Regression, dan Random Forest Regressor. Model terbaik adalah **Random Forest Regressor** dan disimpan di `models/baseline_price_model.joblib`.
-
-## 9. Model Evaluation Summary
-
-| Metric | Value |
+| Pemeriksaan | Hasil |
 |---|---:|
-| MAE | 1.4254 |
-| RMSE | 2.6181 |
-| R2 Score | 0.9214 |
+| Missing `price` | 55,095 rows |
+| Valid price rows | 637,976 rows |
+| `distance <= 0` | 0 rows |
+| `price <= 0` among non-missing price | 0 rows |
+| Missing `source` | 0 rows |
+| Missing `destination` | 0 rows |
+| Missing `cab_type` | 0 rows |
+| Missing `name` | 0 rows |
+| Exact duplicate rows | 0 |
 
-Group error analysis menunjukkan bahwa service `Lux Black XL` memiliki error tertinggi.
+Baris dengan `price` kosong harus dihapus sebelum training karena `price` adalah target supervised learning. Jika target kosong tetap digunakan, model tidak memiliki nilai aktual untuk belajar maupun mengevaluasi error prediksi.
 
-## 10. CI Checklist Summary
+## 5. Preprocessing dan Feature Engineering
 
-Status CI: **PASS**. Check utama meliputi required columns, target tidak missing, `distance > 0`, `price > 0`, categorical columns tidak missing, timestamp valid, dan tidak ada exact duplicate rows.
+Tahap preprocessing dilakukan dengan langkah berikut:
 
-## 11. CT Checklist Summary
+- Menghapus baris dengan `price` kosong.
+- Memastikan `distance` bernilai lebih besar dari 0.
+- Memastikan `price` bernilai lebih besar dari 0 pada data training.
+- Membuat fitur waktu dari `time_stamp`, yaitu `hour`, `day`, `month`, dan `day_of_week`.
+- Menentukan fitur numerik dan fitur kategorikal.
+- Menggunakan preprocessing pipeline agar transformasi training dan prediction konsisten.
 
-Status CT: **mostly PASS with one WARNING**. Warning muncul pada service-level error karena `Lux Black XL` memiliki error tertinggi.
+Fitur yang digunakan model:
 
-## 12. CD Scenario Summary
+- `distance`
+- `cab_type`
+- `source`
+- `destination`
+- `name`
+- `hour`
+- `day`
+- `month`
+- `day_of_week`
 
-CD pada project ini berarti menyiapkan model agar dapat dirilis sebagai prediction service dalam simulasi lokal. Komponen CD meliputi model artifact `.joblib`, model registry JSON, FastAPI skeleton, Shadow Deployment strategy, monitoring, dan rollback plan.
+Kolom yang dikeluarkan:
 
-## 13. MLOps Pipeline Diagram
+- `id`
+- `product_id`
+- `price`
+- `surge_multiplier`
 
-Diagram final tersedia di `diagrams/mlops_pipeline_diagram.md`, `diagrams/mlops_pipeline_diagram_presentable.md`, dan `diagrams/mlops_pipeline_diagram_vertical.md`.
+`id` dan `product_id` dikeluarkan karena berperan sebagai identifier. `price` dikeluarkan dari fitur karena merupakan target. `surge_multiplier` tidak digunakan karena terlalu dekat dengan mekanisme pembentukan tarif.
 
-## 14. Model Registry
+## 6. Pemilihan dan Pelatihan Model
 
-Model registry disimpan di `models/model_registry.json` dengan versi `v1.0-baseline-random-forest`, model type Random Forest Regressor, target `price`, dan approval status `Approved for shadow deployment simulation`.
+Beberapa baseline model dibandingkan untuk melihat performa awal:
 
-## 15. API Plan
+- Dummy Regressor
+- Ridge Regression
+- Random Forest Regressor
 
-API skeleton tersedia di `api/app.py`. Endpoint utama adalah `POST /predict`. Input meliputi `distance`, `cab_type`, `source`, `destination`, `name`, dan `time_stamp`.
+Dummy Regressor digunakan sebagai baseline paling sederhana. Ridge Regression digunakan sebagai baseline linear. Random Forest Regressor digunakan karena dapat menangkap pola non-linear dan interaksi antar fitur kategorikal serta numerik.
 
-## 16. Shadow Deployment Strategy
+Random Forest Regressor dipilih sebagai model terbaik karena menghasilkan MAE dan RMSE paling rendah serta R2 Score paling tinggi dibanding model baseline lain.
 
-Shadow Deployment dipilih karena model dapat menghasilkan prediksi di background terlebih dahulu tanpa mempengaruhi user. Jika stabil, model bisa dipromosikan dalam simulasi.
+## 7. Hasil Evaluasi Model
 
-## 17. Monitoring and Rollback Plan
+| Model | MAE | RMSE | R2 Score |
+|---|---:|---:|---:|
+| Random Forest Regressor | 1.4254 | 2.6181 | 0.9214 |
+| Ridge Regression | 1.9282 | 3.0378 | 0.8941 |
+| Dummy Regressor | 7.5598 | 9.3370 | -0.0000 |
 
-Monitoring yang direncanakan meliputi MAE, RMSE, R2 Score, group-level MAE, prediction input, prediction output, timestamp, dan model version. Jika tidak stabil, model dapat rollback ke previous approved model version.
+MAE menunjukkan rata-rata error absolut antara prediksi dan nilai aktual. RMSE memberi penalti lebih besar pada error yang besar. R2 Score menunjukkan seberapa besar variasi target yang dapat dijelaskan oleh model.
 
-## 18. Limitations
+Berdasarkan tabel evaluasi, Random Forest Regressor menjadi baseline model terkuat.
 
-- Project ini hanya learning simulation.
-- Model tidak menentukan harga nyata untuk perusahaan transportasi apa pun.
-- Weather data belum digabungkan.
-- Model belum dideploy ke cloud.
-- API masih skeleton lokal.
-- Error pada service `Lux Black XL` perlu dimonitor.
+## 8. Analisis Error
 
-## 19. Conclusion
+Analisis error dilakukan untuk melihat apakah performa model stabil pada beberapa grup perjalanan.
 
-Project ini berhasil membuat mini MLOps pipeline dari data understanding sampai CD scenario. Model baseline memberikan hasil yang cukup baik untuk simulasi pembelajaran. CI sudah PASS, CT mostly PASS dengan satu warning, dan CD scenario sudah dirancang menggunakan registry, API plan, Shadow Deployment, monitoring, dan rollback.
+| Distance Group | Row Count | MAE | RMSE |
+|---|---:|---:|---:|
+| long trip | 42,101 | 1.8285 | 3.3426 |
+| medium trip | 42,552 | 1.4846 | 2.5109 |
+| short trip | 42,943 | 0.9716 | 1.7792 |
 
-## 20. Member Roles
+| Cab Type | Row Count | MAE | RMSE |
+|---|---:|---:|---:|
+| Lyft | 61,339 | 1.6723 | 3.1935 |
+| Uber | 66,257 | 1.1968 | 1.9388 |
 
-| Member | Role |
-|---|---|
-| Member 1 | Project overview, problem statement, dan dataset explanation |
-| Member 2 | Data audit, cleaning, dan preprocessing |
-| Member 3 | Model training dan evaluation |
-| Member 4 | CI dan CT quality checklist |
-| Member 5 | CD scenario, API plan, shadow deployment, dan pipeline diagram |
+Service `Lux Black XL` memiliki reviewed service-name error tertinggi dengan MAE 2.9136. Temuan ini menjadi titik monitoring pada CT karena error pada service tertentu dapat menunjukkan bahwa model belum sama stabilnya untuk semua jenis layanan.
+
+## 9. Checklist CI
+
+| CI Check | Purpose | Status | Explanation |
+|---|---|---|---|
+| Required columns exist | Memastikan kolom utama tersedia sebelum preprocessing | PASS | Kolom `price`, `distance`, `cab_type`, `source`, `destination`, `name`, dan `time_stamp` tersedia. |
+| Target price not missing after cleaning | Memastikan data training memiliki target | PASS | Missing `price` dihapus sebelum model dilatih. |
+| `distance > 0` | Memastikan jarak perjalanan valid | PASS | Tidak ada baris dengan `distance <= 0`. |
+| `price > 0` | Memastikan tarif training valid | PASS | Tidak ada `price <= 0` pada baris non-missing. |
+| `source`, `destination`, `cab_type`, and `name` not missing | Memastikan fitur kategorikal utama lengkap | PASS | Keempat kolom tidak memiliki missing value. |
+| `time_stamp` can be converted to datetime | Memastikan fitur waktu dapat dibuat | PASS | Timestamp dapat dikonversi menjadi `hour`, `day`, `month`, dan `day_of_week`. |
+| No exact duplicate rows | Mencegah duplikasi data persis | PASS | Exact duplicate rows berjumlah 0. |
+| Training pipeline can run | Memastikan preprocessing dan model dapat dieksekusi | PASS | Pipeline berhasil digunakan pada notebook training. |
+| Model artifact can be saved | Memastikan model dapat disimpan untuk skenario CD | PASS | Model disimpan sebagai `models/baseline_price_model.joblib`. |
+
+## 10. Checklist CT
+
+| CT Check | Metric / Rule | Status | Explanation |
+|---|---|---|---|
+| MAE threshold | MAE <= 2.00 | PASS | MAE model terbaik adalah 1.4254. |
+| RMSE threshold | RMSE <= 3.50 | PASS | RMSE model terbaik adalah 2.6181. |
+| R2 threshold | R2 Score >= 0.85 | PASS | R2 Score model terbaik adalah 0.9214. |
+| Error by distance group | Error short, medium, dan long trip direview | PASS | Long trip memiliki error tertinggi namun masih menjadi catatan monitoring. |
+| Error by `cab_type` | Error Lyft dan Uber direview | PASS | Lyft memiliki MAE lebih tinggi daripada Uber. |
+| Error by service name | Service-name error direview | WARNING | `Lux Black XL` memiliki MAE 2.9136. |
+| Robustness check for trip distance | Short, medium, dan long trips dibandingkan | PASS | Model lebih akurat pada short trip dan tetap dipantau pada long trip. |
+| Monitoring warning for Lux Black XL | Service dengan error tertinggi harus dipantau | WARNING | Perlu dimonitor dalam skenario Shadow Deployment Simulation. |
+
+## 11. Skenario CD
+
+Skenario CD pada project ini adalah simulasi lokal, bukan deployment cloud sungguhan.
+
+Komponen CD:
+
+- Model format: `.joblib`
+- Model registry: `models/model_registry.json`
+- API framework: FastAPI
+- Endpoint: `/predict`
+- Deployment strategy: Shadow Deployment Simulation
+- Rollback: kembali ke previous approved model version
+- Monitoring: MAE, RMSE, R2 Score, dan group-level MAE
+
+Input API:
+
+- `distance`
+- `cab_type`
+- `source`
+- `destination`
+- `name`
+- `time_stamp`
+
+API hanya digunakan sebagai simulasi lokal. Shadow Deployment Simulation berarti model dapat dijalankan dalam mode simulasi untuk membandingkan prediksi dan memonitor metrik sebelum model dianggap layak dipromosikan. Jika metrik tidak stabil, rollback dilakukan ke model approved sebelumnya.
+
+## 12. Diagram Pipeline
+
+![Diagram Pipeline MLOps](../diagrams/mlops_pipeline_vertical.png)
+
+## 13. Pembagian Peran Anggota
+
+| Anggota | Peran | Tanggung Jawab |
+|---|---|---|
+| Anggota 1 | Data Understanding | Audit dataset dan menjelaskan kasus |
+| Anggota 2 | Preprocessing | Cleaning dan feature engineering |
+| Anggota 3 | Modeling | Training dan evaluasi model |
+| Anggota 4 | CI/CT Checklist | Menyusun checklist kualitas |
+| Anggota 5 | CD Scenario | Model registry, API plan, deployment strategy, diagram |
+
+## 14. Batasan Proyek
+
+- Project ini adalah simulasi pembelajaran.
+- Model bukan sistem pricing produksi nyata.
+- Tidak ada deployment cloud sungguhan.
+- Model hanya menggunakan data perjalanan.
+- Dataset bersifat historis dan bukan data real-time.
+
+## 15. Kesimpulan
+
+Mini pipeline MLOps untuk estimasi tarif transportasi online telah dirancang dari tahap data audit sampai skenario CD. Komponen CI, CT, dan CD sudah dimasukkan dalam alur project.
+
+Random Forest Regressor menghasilkan baseline yang kuat dengan MAE 1.4254, RMSE 2.6181, dan R2 Score 0.9214. Project ini memenuhi output assignment berupa satu diagram pipeline dan satu tabel checklist kualitas yang terintegrasi di laporan akhir.

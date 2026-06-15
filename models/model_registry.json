@@ -22,8 +22,7 @@
         "id": "identifier",
         "product_id": "identifier or product code",
         "price": "target column",
-        "surge_multiplier": "closely related to the pricing mechanism",
-        "weather_columns": "not merged yet because time and location alignment is not prepared"
+        "surge_multiplier": "closely related to the pricing mechanism"
       },
       "training_dataset": "data/processed/cleaned_cab_rides.csv",
       "rows_after_cleaning": 637976,
@@ -32,13 +31,13 @@
       "R2_score": 0.9214,
       "CI_status": "PASS",
       "CT_status": "PASS with monitoring warning for service-name group error",
-      "approval_status": "Approved for shadow deployment simulation",
+      "approval_status": "Approved for Shadow Deployment Simulation",
       "warning_notes": [
         "Highest service-name error group is Lux Black XL.",
-        "Use shadow deployment first and monitor group-level MAE before promotion.",
+        "Use Shadow Deployment Simulation first and monitor group-level MAE before promotion.",
         "This model is a learning simulation, not a real production pricing system."
       ],
-      "created_at": "2026-06-13T18:34:33"
+      "created_at": "2026-06-15T07:42:17"
     }
   ]
 }

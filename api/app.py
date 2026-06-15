@@ -32,7 +32,7 @@ FEATURE_COLUMNS = [
 
 app = FastAPI(
     title="Online Transportation Fare Estimation API",
-    description="Local learning simulation API for an MLOps mini project.",
+    description="Local learning simulation API for trip-data-only fare estimation in an MLOps mini project.",
     version=MODEL_VERSION,
 )
 
@@ -72,7 +72,7 @@ def read_root():
     return {
         "message": "Online transportation fare estimation API is running.",
         "model_version": MODEL_VERSION,
-        "note": "This is a local learning simulation, not a real production pricing system.",
+        "note": "Local learning simulation using trip data only; not a real production pricing system.",
     }
 
 
@@ -93,5 +93,5 @@ def predict_price(request: FarePredictionRequest):
     return {
         "estimated_price": round(estimated_price, 2),
         "model_version": MODEL_VERSION,
-        "note": "This is a learning simulation for fare estimation, not a real production pricing system.",
+        "note": "Local learning simulation using trip data only; price and surge_multiplier are not prediction inputs.",
     }
